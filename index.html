@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Davomat PRO — контроль практики</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#eef2ff;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e2e8f0;--p:#4f46e5;--p2:#7c3aed;--ok:#16a34a;--bad:#dc2626;--warn:#ea580c;--side:#1e1b4b}
+body.dark{--bg:#0f172a;--card:#1e293b;--text:#f1f5f9;--muted:#94a3b8;--line:#334155;--side:#020617}
+*{box-sizing:border-box;font-family:'Segoe UI',Inter,Arial,sans-serif;transition:background .2s}
+body{margin:0;background:var(--bg);color:var(--text)}
+#loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(1000px 600px at 20% 10%,#7c3aed,transparent),radial-gradient(800px 500px at 90% 90%,#06b6d4,transparent),linear-gradient(135deg,#1e1b4b,#4f46e5);padding:16px}
+.login-card{background:#fff;color:#0f172a;padding:32px;border-radius:22px;width:400px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,.35);animation:pop .4s}
+@keyframes pop{from{transform:scale(.95) translateY(10px);opacity:0}}
+.login-card h2{margin:0;text-align:center;font-size:26px}
+.login-card p{text-align:center;color:#64748b;font-size:13px}
+.login-card input{width:100%;margin-top:10px;padding:12px;border:1px solid #cbd5e1;border-radius:12px}
+.btn{border:none;padding:10px 16px;border-radius:11px;cursor:pointer;font-size:14px;font-weight:600;background:var(--p);color:#fff}
+.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn.green{background:var(--ok)}.btn.red{background:var(--bad)}.btn.orange{background:var(--warn)}.btn.gray{background:#64748b}.btn.dark{background:#0f172a}.btn.light{background:#eef2ff;color:#1e1b4b}
+.layout{display:flex;min-height:100vh}
+aside{width:240px;background:linear-gradient(180deg,var(--side),#312e81);color:#fff;padding:18px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh}
+aside .logo{font-size:19px;font-weight:800;margin-bottom:4px}
+aside .school{font-size:12px;opacity:.7;margin-bottom:12px}
+aside button{background:transparent;border:none;color:#e0e7ff;text-align:left;padding:11px 12px;border-radius:11px;cursor:pointer;font-size:14px;font-weight:600}
+aside button.active,aside button:hover{background:rgba(255,255,255,.15);color:#fff}
+aside .foot{margin-top:auto;font-size:11px;opacity:.6}
+.topbar{flex:1;min-width:0}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+main{padding:20px;max-width:1150px;margin:0 auto;padding-bottom:80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 4px 18px rgba(0,0,0,.05)}
+.card h2{margin:0 0 12px;font-size:17px}
+.grid{display:grid;gap:12px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.stat{border-radius:16px;padding:16px;color:#fff;position:relative;overflow:hidden}
+.stat b{font-size:26px;display:block}.stat span{font-size:13px;opacity:.9}
+.stat::after{content:'';position:absolute;right:-20px;top:-20px;width:110px;height:110px;background:rgba(255,255,255,.18);border-radius:50%}
+.s1{background:linear-gradient(135deg,#4f46e5,#7c3aed)}.s2{background:linear-gradient(135deg,#059669,#10b981)}.s3{background:linear-gradient(135deg,#dc2626,#f97316)}.s4{background:linear-gradient(135deg,#0284c7,#06b6d4)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+input,select{padding:10px 12px;border:1px solid var(--line);border-radius:11px;font-size:14px;background:var(--card);color:var(--text);min-width:150px}
+label{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}
+th,td{border:1px solid var(--line);padding:8px;text-align:center}
+th{background:rgba(79,70,229,.08)}
+.avatar{width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;margin-right:6px}
+.dot{width:36px;height:36px;border-radius:12px;border:2px solid var(--line);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:17px;background:var(--card)}
+.dot.present.active{background:#dcfce7;border-color:var(--ok);transform:scale(1.06)}
+.dot.absent.active{background:#fee2e2;border-color:var(--bad);transform:scale(1.06)}
+.dot.late.active{background:#ffedd5;border-color:var(--warn);transform:scale(1.06)}
+body.dark .dot.present.active{background:#14532d}body.dark .dot.absent.active{background:#7f1d1d}body.dark .dot.late.active{background:#7c2d12}
+.badge{padding:3px 11px;border-radius:20px;font-size:12px;color:#fff;font-weight:700}
+.b-ok{background:var(--ok)}.b-bad{background:var(--bad)}.b-warn{background:var(--warn)}.b-gray{background:#94a3b8}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.hidden{display:none!important}
+.hint{font-size:12.5px;color:var(--muted)}
+#toast{position:fixed;bottom:22px;right:22px;background:#0f172a;color:#fff;padding:12px 18px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:.3s;z-index:99}
+#toast.show{opacity:1;transform:translateY(-6px)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50;padding:14px}
+.modal-box{background:var(--card);color:var(--text);border-radius:18px;padding:22px;width:440px;max-width:96vw;max-height:90vh;overflow:auto}
+.modal-box input,.modal-box select{width:100%;margin-top:8px}
+.risk{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;margin-top:8px}
+.dayNav{display:flex;gap:6px;align-items:end}
+.progress{height:8px;background:var(--line);border-radius:10px;overflow:hidden;margin-top:6px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--p),#06b6d4)}
+@media(max-width:860px){aside{width:100%;height:auto;position:static;flex-direction:row;flex-wrap:wrap}aside button{flex:1;white-space:nowrap}.layout{flex-direction:column}}
+@media print{aside,header.top,.toolbar,.no-print{display:none!important}main{max-width:100%}body{background:#fff}.card{box-shadow:none;border:1px solid #000}}
+</style>
+</head>
+<body>
+<div id="loginWrap">
+  <div class="login-card">
+    <h2>📋 Davomat PRO</h2>
+    <p id="loginSub">Контроль практики в школе • Maktab amaliyoti nazorati</p>
+    <div style="text-align:center"><button class="btn light" onclick="setLang('ru')">RU</button> <button class="btn light" onclick="setLang('uz')">UZB</button></div>
+    <input id="loginInput" placeholder="admin">
+    <input id="passInput" type="password" placeholder="••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn" style="width:100%;margin-top:12px;padding:12px" onclick="doLogin()" id="loginBtn">Войти / Kirish</button>
+    <p class="hint">admin / admin123 • 🌙 тёмная тема • 📊 графики • 📥 XLSX/PDF</p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+<div class="layout">
+<aside>
+  <div class="logo">📋 Davomat PRO</div>
+  <div class="school" id="sideSchool">Maktab • Школа</div>
+  <button id="m-dash" class="active" onclick="showTab('dash')">📊 <span data-i18n="tab_dash">Дашборд</span></button>
+  <button id="m-attendance" onclick="showTab('attendance')">✅ <span data-i18n="tab_att">Посещаемость</span></button>
+  <button id="m-students" onclick="showTab('students')">🎓 <span data-i18n="tab_stu">Студенты</span></button>
+  <button id="m-unis" onclick="showTab('unis')">🏛️ <span data-i18n="tab_uni">Университеты</span></button>
+  <button id="m-reports" onclick="showTab('reports')">📑 <span data-i18n="tab_rep">Отчёты</span></button>
+  <button id="m-settings" onclick="showTab('settings')">⚙️ <span data-i18n="tab_set">Настройки</span></button>
+  <div class="foot">v2.0 • RU/UZ • Vercel+Supabase<br><button style="color:#fff;border:1px solid #fff;margin-top:6px" onclick="logout()">⏻ <span data-i18n="exit">Выход</span></button></div>
+</aside>
+<div class="topbar">
+<header class="top">
+  <div><b id="pageTitle">Дашборд</b><br><span class="hint" id="topDate"></span></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <button class="btn light" onclick="setLang('ru')">RU</button>
+    <button class="btn light" onclick="setLang('uz')">UZ</button>
+    <button class="btn dark" onclick="toggleTheme()">🌙</button>
+  </div>
+</header>
+<main>
+<!-- DASH -->
+<section id="sec-dash">
+  <div class="grid g4">
+    <div class="stat s1"><b id="stTotal">0</b><span data-i18n="s_total">Всего студентов</span></div>
+    <div class="stat s2"><b id="stPct">0%</b><span data-i18n="s_avg">Средняя посещаемость</span></div>
+    <div class="stat s3"><b id="stRisk">0</b><span data-i18n="s_risk">Зона риска (&gt;2 пропуска)</span></div>
+    <div class="stat s4"><b id="stUnis">0</b><span data-i18n="s_uni">Университетов</span></div>
+  </div>
+  <div class="grid g2" style="margin-top:12px">
+    <div class="card"><h2>📈 <span data-i18n="ch14">Динамика 14 дней (% явки)</span></h2><canvas id="chLine" height="140"></canvas></div>
+    <div class="card"><h2>🍩 <span data-i18n="chToday">Сегодня</span></h2><canvas id="chPie" height="140"></canvas></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h2>🏆 <span data-i18n="top5">Топ-5 прогульщиков</span></h2><div id="topList"></div></div>
+    <div class="card"><h2>⚠️ <span data-i18n="risk">Зона риска</span></h2><div id="riskList"></div><h2 style="margin-top:14px">🕘 <span data-i18n="feed">Активность</span></h2><div id="feedList" class="hint"></div></div>
+  </div>
+</section>
+
+<!-- ATT -->
+<section id="sec-attendance" class="hidden">
+<div class="card">
+  <h2>✅ <span data-i18n="att_title">Отметить посещаемость</span> <span id="saveDot" class="hint"></span></h2>
+  <div class="row">
+    <div class="dayNav"><button class="btn light" onclick="shiftDate(-1)">◀</button><div><label data-i18n="date">Дата</label><br><input type="date" id="attDate" onchange="onDateChange()"></div><button class="btn light" onclick="shiftDate(1)">▶</button><div><br><button class="btn light" onclick="goToday()">📍</button></div></div>
+    <div><label data-i18n="filter_uni">Университет</label><br><select id="attUniFilter" onchange="renderAttendance()"><option value="">— Все —</option></select></div>
+    <div><label data-i18n="group">Группа</label><br><select id="attGroupFilter" onchange="renderAttendance()"><option value="">— Все —</option></select></div>
+    <div><label data-i18n="search">Поиск</label><br><input id="attSearch" placeholder="Ф.И.О..." oninput="renderAttendance()"></div>
+  </div>
+  <div class="toolbar">
+    <button class="btn green" onclick="markAll('present')">✔ <span data-i18n="all_p">Все пришли</span></button>
+    <button class="btn red" onclick="markAll('absent')">✖ <span data-i18n="all_a">Все пропустили</span></button>
+    <button class="btn orange" onclick="copyYesterday()">📋 <span data-i18n="copy">Копировать вчера</span></button>
+    <button class="btn" onclick="saveAttendance()">💾 <span data-i18n="save">Сохранить</span></button>
+    <button class="btn gray" onclick="exportAttendance()">📥 XLSX</button>
+  </div>
+  <div style="overflow-x:auto"><table><thead><tr><th>№</th><th data-i18n="fio">Ф.И.О.</th><th data-i18n="uni">Университет</th><th data-i18n="group">Группа</th><th data-i18n="status">Статус</th><th>💬</th></tr></thead><tbody id="attBody"></tbody></table></div>
+</div>
+</section>
+
+<!-- STUDENTS -->
+<section id="sec-students" class="hidden">
+<div class="card">
+  <h2>🎓 <span data-i18n="stu_title">Студенты</span></h2>
+  <div class="row">
+    <div><label data-i18n="fio">Ф.И.О.</label><br><input id="stuName" placeholder="Алиева Малика"></div>
+    <div><label data-i18n="uni">Университет</label><br><select id="stuUni"></select></div>
+    <div><label data-i18n="group">Группа</label><br><input id="stuGroup" placeholder="301"></div>
+    <div><label data-i18n="phone">Телефон</label><br><input id="stuPhone" placeholder="+998..."></div>
+    <div><br><button class="btn" onclick="addStudent()">＋ <span data-i18n="add">Добавить</span></button></div>
+  </div>
+  <div class="toolbar">
+    <input id="stuSearch" placeholder="🔍 Поиск..." oninput="renderStudents()" style="flex:1;min-width:180px">
+    <select id="stuSort" onchange="renderStudents()"><option value="name">А-Я</option><option value="miss">Пропуски ↓</option><option value="pct">% посещ. ↓</option></select>
+    <button class="btn green" onclick="exportStudents()">📥 XLSX</button>
+    <label class="btn orange" style="cursor:pointer">📤 XLSX<input type="file" id="importStu" accept=".xlsx,.xls" style="display:none" onchange="importStudents(event)"></label>
+    <button class="btn light" onclick="downloadTemplate()">📄 <span data-i18n="template">Шаблон</span></button>
+    <button class="btn dark" onclick="backupJSON()">💾 JSON</button>
+    <label class="btn gray" style="cursor:pointer">♻️ Restore<input type="file" accept=".json" style="display:none" onchange="restoreJSON(event)"></label>
+  </div>
+  <div style="overflow-x:auto"><table><thead><tr><th>№</th><th data-i18n="fio">Ф.И.О.</th><th data-i18n="uni">Университет</th><th data-i18n="group">Группа</th><th data-i18n="phone">Телефон</th><th>✖</th><th>%</th><th></th></tr></thead><tbody id="stuBody"></tbody></table></div>
+</div>
+</section>
+
+<!-- UNIS -->
+<section id="sec-unis" class="hidden">
+<div class="card"><h2>🏛️ <span data-i18n="uni_title">Университеты</span></h2>
+<div class="row"><div><label data-i18n="uni_name">Название</label><br><input id="uniName" placeholder="ТГПУ / TDPU"></div><div><br><button class="btn" onclick="addUni()">＋ <span data-i18n="add">Добавить</span></button></div></div>
+<table><thead><tr><th>№</th><th data-i18n="uni_name">Название</th><th data-i18n="count">Студентов</th><th>% явки</th><th></th></tr></thead><tbody id="uniBody"></tbody></table></div>
+</section>
+
+<!-- REPORTS -->
+<section id="sec-reports" class="hidden">
+<div class="card"><h2>📑 <span data-i18n="rep_title">Отчёт (авторасчёт пропусков)</span></h2>
+<div class="row">
+<div><label>С</label><br><input type="date" id="repFrom"></div>
+<div><label>По</label><br><input type="date" id="repTo"></div>
+<div><label data-i18n="filter_uni">Университет</label><br><select id="repUniFilter" onchange="renderReports()"><option value="">— Все —</option></select></div>
+<div><label>Мин. пропусков</label><br><select id="repMin" onchange="renderReports()"><option value="0">0</option><option value="1">1+</option><option value="3">3+</option><option value="5">5+</option></select></div>
+<div><br><button class="btn green" onclick="exportReport()">📥 XLSX</button> <button class="btn dark" onclick="window.print()">🖨️ PDF</button> <button class="btn light" onclick="renderReports()">🔄</button></div>
+</div>
+<div style="overflow-x:auto"><table><thead><tr><th>№</th><th data-i18n="fio">Ф.И.О.</th><th data-i18n="uni">Университет</th><th data-i18n="group">Группа</th><th>✔</th><th>✖</th><th>🕒</th><th data-i18n="total">Дней</th><th>%</th><th><span data-i18n="progress">Прогресс</span></th></tr></thead><tbody id="repBody"></tbody></table></div>
+</div>
+</section>
+
+<!-- SETTINGS -->
+<section id="sec-settings" class="hidden">
+<div class="card"><h2>⚙️ <span data-i18n="set_title">Настройки</span></h2>
+<div class="row">
+<div><label>🏫 Школа / Maktab</label><br><input id="setSchool" placeholder="№ 42, Ташкент"></div>
+<div><label>📅 Практика с</label><br><input type="date" id="setStart"></div>
+<div><label>📅 Практика до</label><br><input type="date" id="setEnd"></div>
+<div><br><button class="btn" onclick="saveSettings()">💾 <span data-i18n="save">Сохранить</span></button></div>
+</div></div>
+<div class="card"><h2>🔐 <span data-i18n="pass_title">Сменить пароль</span></h2>
+<div class="row"><div><label>Старый</label><br><input id="oldPass" type="password"></div><div><label>Новый</label><br><input id="newPass" type="password"></div><div><br><button class="btn orange" onclick="changePass()">🔑 OK</button></div></div></div>
+<div class="card"><h2>☁️ Supabase</h2><p class="hint" id="sbStatus">Локальный режим. Ключи в supabase-config.js</p><div class="toolbar"><button class="btn green" onclick="window.SB&&window.SB.pushAll()">☁️ Синхронизировать</button><button class="btn red" onclick="wipeData()">🗑️ <span data-i18n="wipe">Очистить всё</span></button><button class="btn light" onclick="seedDemo()">✨ Демо-данные</button></div></div>
+</section>
+
+</main></div></div></div>
+<div id="toast"></div>
+<div id="modal" class="hidden"></div>
+
+<script src="supabase-config.js"></script>
+<script>
+// ===== I18N =====
+const T={
+ru:{tab_dash:"Дашборд",tab_att:"Посещаемость",tab_stu:"Студенты",tab_uni:"Университеты",tab_rep:"Отчёты",tab_set:"Настройки",exit:"Выход",s_total:"Всего студентов",s_avg:"Средняя посещаемость",s_risk:"Зона риска (>2 пропуска)",s_uni:"Университетов",ch14:"Динамика 14 дней (% явки)",chToday:"Сегодня",top5:"Топ-5 прогульщиков",risk:"Зона риска",feed:"Активность",att_title:"Отметить посещаемость",date:"Дата",filter_uni:"Университет",group:"Группа",search:"Поиск",all_p:"Все пришли",all_a:"Все пропустили",copy:"Копировать вчера",save:"Сохранить",fio:"Ф.И.О.",uni:"Университет",status:"Статус",stu_title:"Студенты",phone:"Телефон",add:"Добавить",template:"Шаблон",uni_title:"Университеты",uni_name:"Название",count:"Студентов",rep_title:"Отчёт (авторасчёт пропусков)",total:"Дней",progress:"Прогресс",set_title:"Настройки",pass_title:"Сменить пароль",wipe:"Очистить всё"},
+uz:{tab_dash:"Boshqaruv",tab_att:"Davomat",tab_stu:"Talabalar",tab_uni:"Universitetlar",tab_rep:"Hisobotlar",tab_set:"Sozlamalar",exit:"Chiqish",s_total:"Jami talabalar",s_avg:"O'rtacha davomat",s_risk:"Xavf zonasi (>2 qoldirish)",s_uni:"Universitetlar",ch14:"14 kunlik dinamika (% kelish)",chToday:"Bugun",top5:"Top-5 qoldiruvchilar",risk:"Xavf zonasi",feed:"Faollik",att_title:"Davomatni belgilash",date:"Sana",filter_uni:"Universitet",group:"Guruh",search:"Qidiruv",all_p:"Hamma keldi",all_a:"Hamma kelmadi",copy:"Ke Ingini nusxalash",save:"Saqlash",fio:"F.I.Sh.",uni:"Universitet",status:"Holat",stu_title:"Talabalar",phone:"Telefon",add:"Qo'shish",template:"Shablon",uni_title:"Universitetlar",uni_name:"Nomi",count:"Talabalar",rep_title:"Hisobot (avto-hisob)",total:"Kun",progress:"Jarayon",set_title:"Sozlamalar",pass_title:"Parolni almashtirish",wipe:"Hammasini tozalash"}};
+let LANG=localStorage.getItem('davomat_lang')||'ru';
+function setLang(l){LANG=l;localStorage.setItem('davomat_lang',l);applyLang();}
+function applyLang(){document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n');if(T[LANG][k])el.textContent=T[LANG][k];});renderAll();}
+// ===== STORE =====
+const LS={get:(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
+let unis=LS.get('davomat_unis',[{id:'u1',name:'ТГПУ им. Низами'},{id:'u2',name:'НУУз'}]);
+let students=LS.get('davomat_students',[{id:'s1',name:'Алиева Малика',uniId:'u1',group:'301',phone:'+998901112233'},{id:'s2',name:'Каримов Отабек',uniId:'u1',group:'302',phone:'+998902223344'},{id:'s3',name:'Юсупова Динара',uniId:'u2',group:'201',phone:'+998903334455'}]);
+let attendance=LS.get('davomat_att',{});
+let comments=LS.get('davomat_comments',{});
+let settings=LS.get('davomat_settings',{school:'Школа №42, Ташкент',start:'',end:'',theme:'light'});
+let feed=LS.get('davomat_feed',[]);
+let draft={_date:''};
+function persist(){LS.set('davomat_unis',unis);LS.set('davomat_students',students);LS.set('davomat_att',attendance);LS.set('davomat_comments',comments);LS.set('davomat_settings',settings);LS.set('davomat_feed',feed.slice(0,30));if(window.SB&&window.SB.enabled){clearTimeout(window._sbT);window._sbT=setTimeout(()=>window.SB.pushAll(true),1500);}}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+function logAct(m){feed.unshift(new Date().toLocaleString()+' — '+m);feed=feed.slice(0,30);LS.set('davomat_feed',feed);}
+const COLORS=['#4f46e5','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
+function colorOf(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%997;return COLORS[h%COLORS.length];}
+function initials(n){return n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+function uniName(id){return (unis.find(u=>u.id===id)||{}).name||'—';}
+function statsOf(sid,from,to){let p=0,a=0,l=0;for(const d in attendance){if(from&&d<from)continue;if(to&&d>to)continue;const v=attendance[d][sid];if(v==='present')p++;else if(v==='absent')a++;else if(v==='late')l++;}const t=p+a+l;const pct=t?Math.round((p+l*.5)/t*100):0;return{p,a,l,t,pct};}
+// ===== THEME =====
+function toggleTheme(){settings.theme=settings.theme==='dark'?'light':'dark';persist();applyTheme();}
+function applyTheme(){document.body.classList.toggle('dark',settings.theme==='dark');}
+// ===== AUTH =====
+function doLogin(){const l=document.getElementById('loginInput').value.trim(),p=document.getElementById('passInput').value;const users=LS.get('davomat_users',[{login:'admin',pass:'admin123'}]);if(users.find(u=>u.login===l&&u.pass===p)||(l==='admin'&&p==='admin123')){localStorage.setItem('davomat_session','1');document.getElementById('loginWrap').classList.add('hidden');document.getElementById('app').classList.remove('hidden');initApp();}else toast('❌ '+(LANG==='ru'?'Неверный логин/пароль':'Login/parol xato'));}
+function logout(){localStorage.removeItem('davomat_session');location.reload();}
+function changePass(){const o=document.getElementById('oldPass').value,n=document.getElementById('newPass').value;let users=LS.get('davomat_users',[{login:'admin',pass:'admin123'}]);const u=users[0];if(o!==u.pass){toast('❌ old pass');return;}if(n.length<4){toast('❌ min 4');return;}users[0].pass=n;LS.set('davomat_users',users);document.getElementById('oldPass').value='';document.getElementById('newPass').value='';toast('✅ OK');logAct('🔑 пароль изменён');}
+// ===== NAV =====
+function showTab(t){['dash','attendance','students','unis','reports','settings'].forEach(x=>{document.getElementById('sec-'+x).classList.toggle('hidden',x!==t);document.getElementById('m-'+x).classList.toggle('active',x===t);});const titles={dash:T[LANG].tab_dash,attendance:T[LANG].tab_att,students:T[LANG].tab_stu,unis:T[LANG].tab_uni,reports:T[LANG].tab_rep,settings:T[LANG].tab_set};document.getElementById('pageTitle').textContent=titles[t];if(t==='dash')renderDash();if(t==='reports')renderReports();}
+// ===== DATE =====
+function curDate(){return document.getElementById('attDate').value||new Date().toISOString().slice(0,10);}
+function shiftDate(n){const d=new Date(curDate());d.setDate(d.getDate()+n);document.getElementById('attDate').value=d.toISOString().slice(0,10);onDateChange();}
+function goToday(){document.getElementById('attDate').value=new Date().toISOString().slice(0,10);onDateChange();}
+function onDateChange(){draft={_date:curDate()};Object.assign(draft,attendance[curDate()]||{});renderAttendance();}
+function markAll(s){filteredStudents().forEach(st=>draft[st.id]=s);renderAttendance();}
+function copyYesterday(){const d=new Date(curDate());d.setDate(d.getDate()-1);const y=d.toISOString().slice(0,10);const src=attendance[y]||{};if(!Object.keys(src).length){toast('—');return;}filteredStudents().forEach(st=>{if(src[st.id])draft[st.id]=src[st.id];});renderAttendance();toast('📋 OK');}
+function setStatus(id,s){draft[id]=s;renderAttendance();}
+function editComment(id){const d=curDate();const cur=(comments[d]||{})[id]||'';const v=prompt(LANG==='ru'?'Комментарий / причина:':'Izoh / sabab:',cur);if(v===null)return;comments[d]=comments[d]||{};comments[d][id]=v;persist();renderAttendance();}
+function filteredStudents(){const uf=document.getElementById('attUniFilter').value,gf=document.getElementById('attGroupFilter').value,q=(document.getElementById('attSearch').value||'').toLowerCase();return students.filter(s=>(!uf||s.uniId===uf)&&(!gf||s.group===gf)&&(!q||s.name.toLowerCase().includes(q)));}
+function saveAttendance(){const d=curDate();attendance[d]=attendance[d]||{};Object.entries(draft).forEach(([k,v])=>{if(!k.startsWith('_'))attendance[d][k]=v;});persist();logAct('💾 '+d+' — '+Object.keys(attendance[d]).length);document.getElementById('saveDot').textContent='✓ '+new Date().toLocaleTimeString();toast('✅ '+(LANG==='ru'?'Сохранено':'Saqlandi'));renderAll();}
+// ===== CRUD =====
+function addUni(){const v=document.getElementById('uniName').value.trim();if(!v)return;unis.push({id:'u'+Date.now(),name:v});document.getElementById('uniName').value='';persist();logAct('🏛️ +'+v);renderAll();}
+function delUni(id){if(!confirm('OK?'))return;unis=unis.filter(u=>u.id!==id);students=students.filter(s=>s.uniId!==id);persist();renderAll();}
+function addStudent(){const n=document.getElementById('stuName').value.trim(),u=document.getElementById('stuUni').value,g=document.getElementById('stuGroup').value.trim(),ph=document.getElementById('stuPhone').value.trim();if(!unis.length){toast('🏛️ +uni');return;}if(!n||!u){toast('✏️ ФИО+uni');return;}students.push({id:'s'+Date.now(),name:n,uniId:u,group:g,phone:ph});document.getElementById('stuName').value='';document.getElementById('stuGroup').value='';document.getElementById('stuPhone').value='';persist();logAct('🎓 +'+n);renderAll();}
+function delStudent(id){if(!confirm('OK?'))return;students=students.filter(s=>s.id!==id);persist();renderAll();}
+function openEdit(id){const s=students.find(x=>x.id===id);if(!s)return;showModal(`<h3>✏️ ${s.name}</h3><label>Ф.И.О.</label><input id="eName" value="${s.name}"><label>Университет</label><select id="eUni">${unis.map(u=>`<option value="${u.id}" ${u.id===s.uniId?'selected':''}>${u.name}</option>`).join('')}</select><label>Группа</label><input id="eGroup" value="${s.group||''}"><label>Телефон</label><input id="ePhone" value="${s.phone||''}"><div class="toolbar"><button class="btn" onclick="saveEdit('${s.id}')">💾 OK</button><button class="btn gray" onclick="closeModal()">✖</button></div>`);}
+function saveEdit(id){const s=students.find(x=>x.id===id);s.name=document.getElementById('eName').value.trim()||s.name;s.uniId=document.getElementById('eUni').value;s.group=document.getElementById('eGroup').value;s.phone=document.getElementById('ePhone').value;persist();closeModal();renderAll();}
+function openHist(id){const s=students.find(x=>x.id===id);const st=statsOf(id);let rows='';Object.keys(attendance).sort().reverse().slice(0,20).forEach(d=>{const v=attendance[d][id];if(!v)return;const c=(comments[d]||{})[id]||'';const ic=v==='present'?'✔':v==='absent'?'✖':'🕒';rows+=`<div class="risk"><span>${d} ${ic}</span><span class="hint">${c}</span></div>`;});showModal(`<h3>${s.name}</h3><p class="hint">${uniName(s.uniId)} • ${s.group||''} • ✔${st.p} ✖${st.a} 🕒${st.l} • ${st.pct}%</p>${rows||'—'}<div class="toolbar"><button class="btn gray" onclick="closeModal()">✖</button></div>`);}
+function showModal(h){const m=document.getElementById('modal');m.innerHTML=`<div class="modal-box">${h}</div>`;m.classList.remove('hidden');}
+function closeModal(){document.getElementById('modal').classList.add('hidden');}
+// ===== RENDER =====
+let chL=null,chP=null;
+function renderDash(){
+  document.getElementById('stTotal').textContent=students.length;
+  document.getElementById('stUnis').textContent=unis.length;
+  const all=students.map(s=>statsOf(s.id).pct);const avg=all.length?Math.round(all.reduce((a,b)=>a+b,0)/all.length):0;
+  document.getElementById('stPct').textContent=avg+'%';
+  const risk=students.filter(s=>statsOf(s.id).a>2);document.getElementById('stRisk').textContent=risk.length;
+  // lists
+  const top=[...students].map(s=>({s,a:statsOf(s.id).a})).sort((a,b)=>b.a-a.a).slice(0,5);
+  document.getElementById('topList').innerHTML=top.map((x,i)=>`<div class="risk"><span>${i+1}. ${x.s.name}</span><span class="badge b-bad">${x.a} ✖</span></div>`).join('')||'<p class="hint">—</p>';
+  document.getElementById('riskList').innerHTML=risk.slice(0,8).map(s=>`<div class="risk"><span><span class="avatar" style="background:${colorOf(s.name)}">${initials(s.name)}</span>${s.name}</span><span class="badge b-warn">${statsOf(s.id).a} ✖</span></div>`).join('')||'<p class="hint">✅ '+(LANG==='ru'?'Все хорошо!':'Hammasi yaxshi!')+'</p>';
+  document.getElementById('feedList').innerHTML=feed.slice(0,6).map(f=>`• ${f}`).join('<br>')||'—';
+  // charts
+  const days=[...Array(14)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()-(13-i));return d.toISOString().slice(0,10);});
+  const pcts=days.map(d=>{const rec=attendance[d]||{};const vals=Object.values(rec);if(!vals.length)return null;const p=vals.filter(v=>v==='present').length+vals.filter(v=>v==='late').length*.5;return Math.round(p/vals.length*100);});
+  if(chL)chL.destroy();chL=new Chart(document.getElementById('chLine'),{type:'line',data:{labels:days.map(d=>d.slice(5)),datasets:[{data:pcts,borderColor:'#4f46e5',backgroundColor:'rgba(79,70,229,.2)',fill:true,tension:.4,spanGaps:true}]},options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:100}}}});
+  const t=new Date().toISOString().slice(0,10);const rec=attendance[t]||{};const vals=Object.values(rec);
+  const p=vals.filter(v=>v==='present').length,a=vals.filter(v=>v==='absent').length,l=vals.filter(v=>v==='late').length;
+  if(chP)chP.destroy();chP=new Chart(document.getElementById('chPie'),{type:'doughnut',data:{labels:['✔','✖','🕒'],datasets:[{data:[p,a,l],backgroundColor:['#16a34a','#dc2626','#ea580c']}]}});
+}
+function renderAttendance(){
+  const d=curDate();if(draft._date!==d){draft={_date:d};Object.assign(draft,attendance[d]||{});}
+  const body=document.getElementById('attBody');body.innerHTML='';
+  filteredStudents().forEach((s,i)=>{const v=draft[s.id]||'present';const c=(comments[d]||{})[s.id]||'';const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td style="text-align:left"><span class="avatar" style="background:${colorOf(s.name)}">${initials(s.name)}</span>${s.name}${c?`<br><span class="hint">💬 ${c}</span>`:''}</td><td>${uniName(s.uniId)}</td><td>${s.group||''}</td><td><span class="dot present ${v==='present'?'active':''}" onclick="setStatus('${s.id}','present')">✔</span> <span class="dot absent ${v==='absent'?'active':''}" onclick="setStatus('${s.id}','absent')">✖</span> <span class="dot late ${v==='late'?'active':''}" onclick="setStatus('${s.id}','late')">🕒</span></td><td><button class="btn light" onclick="editComment('${s.id}')">💬</button></td>`;body.appendChild(tr);});
+}
+function renderStudents(){
+  const q=(document.getElementById('stuSearch').value||'').toLowerCase(),sort=document.getElementById('stuSort').value;
+  let list=students.filter(s=>!q||s.name.toLowerCase().includes(q)||(s.group||'').toLowerCase().includes(q));
+  list=list.map(s=>({s,st:statsOf(s.id)}));
+  if(sort==='miss')list.sort((a,b)=>b.st.a-a.st.a);else if(sort==='pct')list.sort((a,b)=>a.st.pct-b.st.pct);else list.sort((a,b)=>a.s.name.localeCompare(b.s.name));
+  const b=document.getElementById('stuBody');b.innerHTML='';
+  list.forEach(({s,st},i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i+1}</td><td style="text-align:left"><span class="avatar" style="background:${colorOf(s.name)}">${initials(s.name)}</span>${s.name}<br><span class="hint">${s.phone||''}</span></td><td>${uniName(s.uniId)}</td><td>${s.group||''}</td><td>${s.phone||''}</td><td><span class="badge ${st.a>2?'b-bad':st.a>0?'b-warn':'b-ok'}">${st.a}</span></td><td>${st.pct}%<div class="progress"><i style="width:${st.pct}%"></i></div></td><td style="white-space:nowrap"><button class="btn light" onclick="openHist('${s.id}')">👁</button> <button class="btn orange" onclick="openEdit('${s.id}')">✏️</button> <button class="btn red" onclick="delStudent('${s.id}')">✖</button></td>`;b.appendChild(tr);});
+}
+function renderUnis(){
+  const b=document.getElementById('uniBody');b.innerHTML='';
+  unis.forEach((u,i)=>{const ss=students.filter(s=>s.uniId===u.id);const avg=ss.length?Math.round(ss.reduce((a,s)=>a+statsOf(s.id).pct,0)/ss.length):0;const tr=document.createElement('tr');tr.innerHTML=`<td>${i+1}</td><td style="text-align:left"><span class="avatar" style="background:${colorOf(u.name)}">${initials(u.name)}</span>${u.name}</td><td>${ss.length}</td><td>${avg}%</td><td><button class="btn red" onclick="delUni('${u.id}')">✖</button></td>`;b.appendChild(tr);});
+  const fill=(id,all)=>{const e=document.getElementById(id);const cur=e.value;e.innerHTML=(all?`<option value="">— ${LANG==='ru'?'Все':'Barchasi'} —</option>`:'')+unis.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');if([...e.options].some(o=>o.value===cur))e.value=cur;};
+  fill('stuUni',false);fill('attUniFilter',true);fill('repUniFilter',true);
+  const groups=[...new Set(students.map(s=>s.group).filter(Boolean))];
+  const g=document.getElementById('attGroupFilter');const gc=g.value;g.innerHTML=`<option value="">— ${LANG==='ru'?'Все':'Barchasi'} —</option>`+groups.map(x=>`<option>${x}</option>`).join('');if(groups.includes(gc))g.value=gc;
+}
+function renderReports(){
+  const f=document.getElementById('repFrom').value,t=document.getElementById('repTo').value,uf=document.getElementById('repUniFilter').value,min=+document.getElementById('repMin').value;
+  const b=document.getElementById('repBody');b.innerHTML='';
+  students.filter(s=>(!uf||s.uniId===uf)).map(s=>({s,st:statsOf(s.id,f||null,t||null)})).filter(x=>x.st.a>=min).sort((a,b)=>b.st.a-a.st.a).forEach(({s,st},i)=>{const tr=document.createElement('tr');tr.innerHTML=`<td>${i+1}</td><td style="text-align:left">${s.name}</td><td>${uniName(s.uniId)}</td><td>${s.group||''}</td><td>${st.p}</td><td><b style="color:var(--bad)">${st.a}</b></td><td>${st.l}</td><td>${st.t}</td><td>${st.pct}%</td><td style="min-width:90px"><div class="progress"><i style="width:${st.pct}%"></i></div></td>`;b.appendChild(tr);});
+}
+function renderAll(){renderUnis();renderStudents();renderAttendance();renderReports();if(!document.getElementById('sec-dash').classList.contains('hidden'))renderDash();document.getElementById('sideSchool').textContent=settings.school||'Maktab • Школа';document.getElementById('sbStatus').textContent=(window.SB&&window.SB.enabled)?'✅ Supabase connected':'💻 Локальный режим. Ключи в supabase-config.js';}
+// ===== XLSX / PDF / BACKUP =====
+function exportStudents(){const rows=students.map((s,i)=>{const st=statsOf(s.id);return{'№':i+1,'F.I.Sh.':s.name,'Universitet':uniName(s.uniId),'Guruh':s.group,'Telefon':s.phone,'Kelmagan':st.a,'Kechikgan':st.l,'Foiz':st.pct}});const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Students');XLSX.writeFile(wb,'talabalar.xlsx');toast('📥 OK');}
+function exportAttendance(){const dates=Object.keys(attendance).sort();const rows=students.map((s,i)=>{const r={'№':i+1,'F.I.Sh.':s.name,'Universitet':uniName(s.uniId),'Guruh':s.group};dates.forEach(d=>{const v=(attendance[d]||{})[s.id];r[d]=v==='present'?'✔':v==='absent'?'✖':v==='late'?'🕒':'';});r['Qoldirish']=statsOf(s.id).a;return r;});const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Davomat');XLSX.writeFile(wb,'davomat.xlsx');toast('📥 OK');}
+function exportReport(){const f=document.getElementById('repFrom').value,t=document.getElementById('repTo').value,uf=document.getElementById('repUniFilter').value;const rows=students.filter(s=>!uf||s.uniId===uf).map((s,i)=>{const st=statsOf(s.id,f||null,t||null);return{'№':i+1,'F.I.Sh.':s.name,'Universitet':uniName(s.uniId),'Guruh':s.group,'Keldi':st.p,'Kelmadi':st.a,'Kechikdi':st.l,'Jami':st.t,'Foiz':st.pct}});const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Hisobot');XLSX.writeFile(wb,'hisobot.xlsx');toast('📥 OK');}
+function downloadTemplate(){const ws=XLSX.utils.json_to_sheet([{'F.I.Sh.':'Aliyeva Malika','Universitet':unis[0]?.name||'TGPU','Guruh':'301','Telefon':'+998901112233'}]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'T');XLSX.writeFile(wb,'shablon.xlsx');}
+function importStudents(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const wb=XLSX.read(ev.target.result,{type:'array'});const data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);let n=0;data.forEach(row=>{const name=row['F.I.Sh.']||row['Ф.И.О.']||row['name']||'';if(!name)return;const uniN=row['Universitet']||row['Университет']||'';const group=row['Guruh']||row['Группа']||'';const phone=row['Telefon']||row['Телефон']||'';let u=unis.find(x=>x.name.toLowerCase()===String(uniN).toLowerCase());if(uniN&&!u){u={id:'u'+Date.now()+Math.random(),name:uniN};unis.push(u);}students.push({id:'s'+Date.now()+Math.random()+n,name,uniId:u?u.id:(unis[0]?.id||''),group:String(group),phone:String(phone)});n++;});persist();renderAll();toast('✅ +'+n);logAct('📤 import +'+n);};r.readAsArrayBuffer(f);e.target.value='';}
+function backupJSON(){const blob=new Blob([JSON.stringify({unis,students,attendance,comments,settings},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='davomat_backup.json';a.click();toast('💾 OK');}
+function restoreJSON(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.unis)unis=d.unis;if(d.students)students=d.students;if(d.attendance)attendance=d.attendance;if(d.comments)comments=d.comments;if(d.settings)settings=d.settings;persist();renderAll();toast('♻️ OK');}catch{toast('❌ file');}};r.readAsText(f);e.target.value='';}
+// ===== SETTINGS =====
+function saveSettings(){settings.school=document.getElementById('setSchool').value;settings.start=document.getElementById('setStart').value;settings.end=document.getElementById('setEnd').value;persist();renderAll();toast('✅');}
+function wipeData(){if(!confirm('Hamma data o‘chsinmi? / Удалить всё?'))return;localStorage.removeItem('davomat_unis');localStorage.removeItem('davomat_students');localStorage.removeItem('davomat_att');localStorage.removeItem('davomat_comments');location.reload();}
+function seedDemo(){const names=['Azimova Nilufar','Toshpo‘latov Sardor','Qodirova Sevara','Ergashev Jasur','Hakimova Sabrina','Nazarov Timur'];const u=unis[0]?.id||'u1';names.forEach((n,i)=>students.push({id:'s'+Date.now()+i,name:n,uniId:u,group:'30'+(i%3+1),phone:'+99890'+(1000000+i*11111)}));for(let k=0;k<10;k++){const d=new Date();d.setDate(d.getDate()-k);const ds=d.toISOString().slice(0,10);attendance[ds]=attendance[ds]||{};students.forEach(s=>{if(!attendance[ds][s.id])attendance[ds][s.id]=Math.random()<.8?'present':Math.random()<.6?'absent':'late';});}persist();renderAll();toast('✨ demo');}
+// ===== INIT =====
+function initApp(){applyTheme();document.getElementById('attDate').value=new Date().toISOString().slice(0,10);document.getElementById('topDate').textContent=new Date().toLocaleDateString()+' • '+(settings.school||'');document.getElementById('setSchool').value=settings.school||'';document.getElementById('setStart').value=settings.start||'';document.getElementById('setEnd').value=settings.end||'';draft={};renderAll();renderDash();if(window.SB&&window.SB.enabled)window.SB.load();}
+applyLang();applyTheme();
+if(localStorage.getItem('davomat_session')){document.getElementById('loginWrap').classList.add('hidden');document.getElementById('app').classList.remove('hidden');initApp();}
+document.getElementById('modal')?.addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
+</script>
+</body>
+</html>
